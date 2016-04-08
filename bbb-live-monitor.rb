@@ -5,6 +5,17 @@ require 'rubygems'
 require 'redis'
 require 'json'
 
+def every_so_many_seconds(seconds)
+  last_tick = Time.now
+  loop do
+    sleep 0.1
+    if Time.now - last_tick >= seconds
+      last_tick += seconds
+      yield
+    end
+  end
+end
+
 $redis = Redis.new(:timeout => 0)
 $meetings = {}
 $stats = {
@@ -21,9 +32,8 @@ STDOUT.sync = true
 
 puts "date,num_meetings,num_users,num_bots,num_voice_participants,num_voice_listeners,num_videos"
 Thread.new do
-  while true do
+  every_so_many_seconds(1) do
     puts "#{Time.now.strftime('%d-%m %T')},#{$stats[:num_meetings]},#{$stats[:num_users]},#{$stats[:num_bots]},#{$stats[:num_voice_participants]},#{$stats[:num_voice_listeners]},#{$stats[:num_videos]}"
-    sleep 1
   end
 end
 

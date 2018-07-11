@@ -25,7 +25,6 @@ $stats = {
   :num_voice_participants => 0,
   :num_voice_listeners => 0,
   :num_videos => 0,
-  :desktop_sharing => false,
 }
 
 STDOUT.sync = true
@@ -37,59 +36,71 @@ Thread.new do
   end
 end
 
-$redis.subscribe('bigbluebutton:from-bbb-apps:meeting', 'bigbluebutton:from-bbb-apps:users') do |on|
+$redis.subscribe('from-akka-apps-redis-channel') do |on|
   on.message do |channel, msg|
     data = JSON.parse(msg)
-    type = data['header']['name']
+    header = data['core']['header']
+    body = data['core']['body']
+    type = header['name']
     case type
-    when "meeting_created_message"
-      meeting_id = data['payload']['meeting_id']
+    when "MeetingCreatedEvtMsg"
+      meeting_prop = body['props']['meetingProp']
+      meeting_id = meeting_prop['intId']
       if not $meetings.has_key?(meeting_id)
         meeting = {
           :users => {}
         }
         $meetings[meeting_id] = meeting
       end
-    when "meeting_destroyed_event"
-      meeting_id = data['payload']['meeting_id']
+    when "MeetingDestroyedEvtMsg"
+      meeting_id = body['meetingId']
       if $meetings.has_key?(meeting_id)
         $meetings.delete(meeting_id)
       end
-    when "user_joined_message"
-      meeting_id = data['payload']['meeting_id']
-      userid = data['payload']['user']['userid']
+    when "UserJoinedMeetingEvtMsg"
+      meeting_id = header['meetingId']
+      userid = header['userId']
       if $meetings.has_key?(meeting_id) and not $meetings[meeting_id][:users].has_key?(userid)
         user = {
-          :listenOnly => data['payload']['user']['listenOnly'],
-          :voiceUser => data['payload']['user']['voiceUser']['joined'],
+          :listenOnly => false,
+          :voiceUser => false,
           :videos => [],
-          :bot => data['payload']['user']['name'].downcase.start_with?('bot')
+          :bot => body['name'].downcase.start_with?('bot')
         }
         $meetings[meeting_id][:users][userid] = user
       end
-    when "user_left_message"
-      meeting_id = data['payload']['meeting_id']
-      userid = data['payload']['user']['userid']
+    when "UserLeftMeetingEvtMsg"
+      meeting_id = header['meetingId']
+      userid = header['userId']
       if $meetings.has_key?(meeting_id) and $meetings[meeting_id][:users].has_key?(userid)
         $meetings[meeting_id][:users].delete(userid)
       end
-    when "user_listening_only"
-      meeting_id = data['payload']['meeting_id']
-      userid = data['payload']['userid']
+    when "UserJoinedVoiceConfToClientEvtMsg"
+      meeting_id = header['meetingId']
+      userid = header['userId']
       if $meetings.has_key?(meeting_id) and $meetings[meeting_id][:users].has_key?(userid)
-        $meetings[meeting_id][:users][userid][:listenOnly] = data['payload']['listen_only']
+        $meetings[meeting_id][:users][userid][:listenOnly] = body['listenOnly']
+        $meetings[meeting_id][:users][userid][:voiceUser] = !body['listenOnly']
       end
-    when "user_joined_voice_message", "user_left_voice_message"
-      meeting_id = data['payload']['meeting_id']
-      userid = data['payload']['user']['userid']
+    when "UserLeftVoiceConfToClientEvtMsg"
+      meeting_id = header['meetingId']
+      userid = header['userId']
       if $meetings.has_key?(meeting_id) and $meetings[meeting_id][:users].has_key?(userid)
-        $meetings[meeting_id][:users][userid][:voiceUser] = data['payload']['user']['voiceUser']['joined']
+        $meetings[meeting_id][:users][userid][:listenOnly] = false
+        $meetings[meeting_id][:users][userid][:voiceUser] = false
       end
-    when "user_shared_webcam_message", "user_unshared_webcam_message"
-      meeting_id = data['payload']['meeting_id']
-      userid = data['payload']['userid']
+    when "UserBroadcastCamStartedEvtMsg"
+      meeting_id = header['meetingId']
+      userid = header['userId']
       if $meetings.has_key?(meeting_id) and $meetings[meeting_id][:users].has_key?(userid)
-        $meetings[meeting_id][:users][userid][:videos] = data['payload']['stream'].split(',')
+        $meetings[meeting_id][:users][userid][:videos] = body['stream'].split(',')
+      end
+    end
+    when "UserBroadcastCamStoppedEvtMsg"
+      meeting_id = header['meetingId']
+      userid = header['userId']
+      if $meetings.has_key?(meeting_id) and $meetings[meeting_id][:users].has_key?(userid)
+        $meetings[meeting_id][:users][userid][:videos] = []
       end
     end
 

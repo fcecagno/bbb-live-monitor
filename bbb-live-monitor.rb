@@ -95,7 +95,6 @@ $redis.subscribe('from-akka-apps-redis-channel') do |on|
       if $meetings.has_key?(meeting_id) and $meetings[meeting_id][:users].has_key?(userid)
         $meetings[meeting_id][:users][userid][:videos] = body['stream'].split(',')
       end
-    end
     when "UserBroadcastCamStoppedEvtMsg"
       meeting_id = header['meetingId']
       userid = header['userId']

@@ -121,6 +121,6 @@ $redis.subscribe('from-akka-apps-redis-channel') do |on|
     $stats[:num_voice_participants] = $meetings.inject(0) { |total, (k, v)| total + v[:users].values.select { |u| u[:voiceUser] }.length }
     $stats[:num_voice_listeners] = $meetings.inject(0) { |total, (k, v)| total + v[:users].values.select { |u| u[:listenOnly] }.length }
     $stats[:num_videos] = $meetings.inject(0) { |total, (k, v)| total + v[:users].inject(0) { |total, (k, v)| total + v[:videos].length } }
-    $stats[:num_screenshares] = $meetings.inject(0) { |total, (k, v)| total total + (v[:screenshare] ? 1 : 0) }
+    $stats[:num_screenshares] = $meetings.inject(0) { |total, (k, v)| total + (v[:screenshare] ? 1 : 0) }
   end
 end

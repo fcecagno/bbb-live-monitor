@@ -25,14 +25,15 @@ $stats = {
   :num_voice_participants => 0,
   :num_voice_listeners => 0,
   :num_videos => 0,
+  :num_screenshares => 0,
 }
 
 STDOUT.sync = true
 
-puts "date,num_meetings,num_users,num_bots,num_voice_participants,num_voice_listeners,num_videos"
+puts "date,num_meetings,num_users,num_bots,num_voice_participants,num_voice_listeners,num_videos,num_screenshares"
 Thread.new do
   every_so_many_seconds(1) do
-    puts "#{Time.now.strftime('%d-%m %T')},#{$stats[:num_meetings]},#{$stats[:num_users]},#{$stats[:num_bots]},#{$stats[:num_voice_participants]},#{$stats[:num_voice_listeners]},#{$stats[:num_videos]}"
+    puts "#{Time.now.strftime('%d-%m %T')},#{$stats[:num_meetings]},#{$stats[:num_users]},#{$stats[:num_bots]},#{$stats[:num_voice_participants]},#{$stats[:num_voice_listeners]},#{$stats[:num_videos]},#{$stats[:num_screenshares]}"
   end
 end
 
@@ -48,7 +49,8 @@ $redis.subscribe('from-akka-apps-redis-channel') do |on|
       meeting_id = meeting_prop['intId']
       if not $meetings.has_key?(meeting_id)
         meeting = {
-          :users => {}
+          :users => {},
+          :screenshare => false
         }
         $meetings[meeting_id] = meeting
       end
@@ -101,6 +103,16 @@ $redis.subscribe('from-akka-apps-redis-channel') do |on|
       if $meetings.has_key?(meeting_id) and $meetings[meeting_id][:users].has_key?(userid)
         $meetings[meeting_id][:users][userid][:videos] = []
       end
+    when "ScreenshareRtmpBroadcastStartedEvtMsg"
+      meeting_id = header['meetingId']
+      if $meetings.has_key?(meeting_id)
+        $meetings[meeting_id][:screenshare] = true
+      end
+    when "ScreenshareRtmpBroadcastStoppedEvtMsg"
+      meeting_id = header['meetingId']
+      if $meetings.has_key?(meeting_id)
+        $meetings[meeting_id][:screenshare] = false
+      end
     end
 
     $stats[:num_meetings] = $meetings.length
@@ -109,5 +121,6 @@ $redis.subscribe('from-akka-apps-redis-channel') do |on|
     $stats[:num_voice_participants] = $meetings.inject(0) { |total, (k, v)| total + v[:users].values.select { |u| u[:voiceUser] }.length }
     $stats[:num_voice_listeners] = $meetings.inject(0) { |total, (k, v)| total + v[:users].values.select { |u| u[:listenOnly] }.length }
     $stats[:num_videos] = $meetings.inject(0) { |total, (k, v)| total + v[:users].inject(0) { |total, (k, v)| total + v[:videos].length}}
+    $stats[:num_screenshares] = $meetings.inject(0) { |total, (k, v)| total + v[:screenshare].length}
   end
 end

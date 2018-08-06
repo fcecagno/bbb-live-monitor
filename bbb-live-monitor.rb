@@ -85,11 +85,21 @@ $redis.subscribe('bigbluebutton:from-bbb-apps:meeting', 'bigbluebutton:from-bbb-
       if $meetings.has_key?(meeting_id) and $meetings[meeting_id][:users].has_key?(userid)
         $meetings[meeting_id][:users][userid][:voiceUser] = data['payload']['user']['voiceUser']['joined']
       end
-    when "user_shared_webcam_message", "user_unshared_webcam_message"
+    when "user_shared_webcam_message"
       meeting_id = data['payload']['meeting_id']
       userid = data['payload']['userid']
+      stream = data['payload']['stream']
       if $meetings.has_key?(meeting_id) and $meetings[meeting_id][:users].has_key?(userid)
-        $meetings[meeting_id][:users][userid][:videos] = data['payload']['stream'].split(',')
+        if !$meetings[meeting_id][:users][userid][:videos].include?(stream)
+          $meetings[meeting_id][:users][userid][:videos].push(stream)
+        end
+      end
+    when "user_unshared_webcam_message"
+      meeting_id = data['payload']['meeting_id']
+      userid = data['payload']['userid']
+      stream = data['payload']['stream']
+      if $meetings.has_key?(meeting_id) and $meetings[meeting_id][:users].has_key?(userid)
+        $meetings[meeting_id][:users][userid][:videos].delete(stream)
       end
     end
 
